@@ -1028,7 +1028,7 @@ def main():
         )
         topk = st.slider("Manual top-k policy", 0.05, 1.00, 0.80, 0.05)
         boot_n = st.select_slider("Bootstrap samples", options=[200, 400, 800, 1000, 2000], value=2000)
-        siamese_fast_mode = st.toggle("Fast demo mode for Siamese training", value=False)
+        siamese_fast_mode = st.toggle("Fast demo mode for Siamese training", value=True)
         siamese_choices = st.multiselect(
             "Siamese experiments to run",
             options=["baseline_cnn_pair", "bag_cnn"],
