@@ -200,7 +200,8 @@ def random_qini_baseline(T_logged: np.ndarray, y_true: np.ndarray, n_rep: int = 
 
 def auqc(uplift_scores: np.ndarray, T_logged: np.ndarray, y_true: np.ndarray) -> float:
     frac, q = qini_curve(uplift_scores, T_logged, y_true)
-    return float(np.trapz(q, frac))
+    integrate = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+    return float(integrate(q, frac))
 
 
 def bootstrap_uplift_summaries(uplift_by_model: dict, B: int = 100, seed: int = 42) -> pd.DataFrame:
