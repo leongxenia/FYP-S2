@@ -826,6 +826,35 @@ def render_uplift_section(bundle: dict, uplift_results: Optional[dict]):
 
 
 
+def render_glm_summary_tables(hte_results: dict):
+    glm_model = hte_results.get("glm_model")
+
+    if glm_model is None:
+        st.code(hte_results["glm_summary_text"])
+        return
+
+    try:
+        summary2 = glm_model.summary2()
+
+        model_fit_df = summary2.tables[0].copy()
+        coef_df = summary2.tables[1].reset_index().rename(columns={"index": "term"}).copy()
+
+        for df_ in [model_fit_df, coef_df]:
+            num_cols = df_.select_dtypes(include=[np.number]).columns
+            if len(num_cols) > 0:
+                df_.loc[:, num_cols] = df_.loc[:, num_cols].round(4)
+
+        st.markdown("**Model fit summary**")
+        st.dataframe(model_fit_df, use_container_width=True)
+
+        st.markdown("**Coefficient table**")
+        st.dataframe(coef_df, use_container_width=True, hide_index=True)
+
+    except Exception:
+        st.code(hte_results["glm_summary_text"])
+
+
+
 def render_hte_section(hte_results: Optional[dict]):
     st.subheader("Exploratory Heterogeneous Treatment Effect Analysis")
     if hte_results is None:
@@ -848,7 +877,7 @@ def render_hte_section(hte_results: Optional[dict]):
     with tab1:
         st.dataframe(interaction_df, use_container_width=True)
         with st.expander("View full logistic regression summary"):
-            st.text(hte_results["glm_summary_text"])
+            render_glm_summary_tables(hte_results)
 
     with tab2:
         st.markdown("**Device**")
@@ -999,7 +1028,7 @@ def main():
         )
         topk = st.slider("Manual top-k policy", 0.05, 1.00, 0.80, 0.05)
         boot_n = st.select_slider("Bootstrap samples", options=[200, 400, 800, 1000, 2000], value=2000)
-        siamese_fast_mode = st.toggle("Fast demo mode for Siamese training", value=True)
+        siamese_fast_mode = st.toggle("Fast demo mode for Siamese training", value=False)
         siamese_choices = st.multiselect(
             "Siamese experiments to run",
             options=["baseline_cnn_pair", "bag_cnn"],
