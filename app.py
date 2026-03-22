@@ -29,7 +29,7 @@ st.set_page_config(
 )
 
 
-def build_custom_css(theme_mode: str = "Light", font_scale: float = 1.35) -> str:
+def build_custom_css(theme_mode: str = "Light", font_scale: float = 1.30) -> str:
     if theme_mode == "Dark":
         colors = {
             "bg": "#0b1220",
@@ -427,7 +427,7 @@ def init_state():
         "hte_results": None,
         "siamese_results": None,
         "appearance": "Light",
-        "font_scale": 1.35,
+        "font_scale": 1.30,
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
