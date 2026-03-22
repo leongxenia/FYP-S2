@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import hashlib
-from io import StringIO
+from pathlib import Path
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -442,6 +441,24 @@ def reset_analysis_state(new_hash: Optional[str]):
     st.session_state.siamese_results = None
 
 
+def get_bundled_dataset_map() -> dict[str, str]:
+    return {
+        "Original dataset": "ab_testing.csv",
+        "Modified dataset": "ab_testing_modified.csv",
+    }
+
+
+def load_bundled_dataset(dataset_label: str) -> pd.DataFrame:
+    dataset_map = get_bundled_dataset_map()
+    file_name = dataset_map[dataset_label]
+    file_path = Path(__file__).resolve().parent / file_name
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"Could not find {file_name}. Please place it in the same folder as app.py."
+        )
+    return pd.read_csv(file_path)
+
+
 # -----------------------------------------------------------------------------
 # Plot helpers
 # -----------------------------------------------------------------------------
@@ -617,11 +634,11 @@ def render_overview():
         <div class="hero">
             <h2 style="margin-bottom:0.35rem;">ML-Driven A/B Testing for Enhanced Digital Ad Optimization</h2>
             <p style="margin-bottom:0.25rem;">
-                This dashboard presents the core analytical components of the final year project through a polished and interactive interface.
+                This dashboard presents the core analytical components of the final year project through an interactive interface.
                 It combines uplift modelling, exploratory heterogeneous treatment effect analysis, and Siamese-network experiments
                 within a single platform designed to showcase the project cohesively.
             </p>
-            <p class="small-note">Upload the dataset in the sidebar, then run the analytical components you would like to present.</p>
+            <p class="small-note">Choose a dataset in the sidebar, then run the analytical components you would like to present.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -963,17 +980,23 @@ def main():
             key="appearance",
             help="Switch the dashboard palette between light and dark presentation modes.",
         )
+        if "font_scale" not in st.session_state:
+            st.session_state.font_scale = 1.20
+            
         st.slider(
             "Font size scale",
             min_value=1.00,
             max_value=1.80,
-            value=float(st.session_state.font_scale),
             step=0.05,
             key="font_scale",
             help="Increase text size for easier readability during presentation.",
         )
         st.divider()
-        uploaded = st.file_uploader("Upload ab_testing.csv", type=["csv"], label_visibility="collapsed")
+        dataset_label = st.selectbox(
+            "Dataset",
+            options=list(get_bundled_dataset_map().keys()),
+            help="Choose which bundled dataset to use throughout the dashboard.",
+        )
         topk = st.slider("Manual top-k policy", 0.05, 1.00, 0.80, 0.05)
         boot_n = st.select_slider("Bootstrap samples", options=[200, 400, 800, 1000, 2000], value=2000)
         siamese_fast_mode = st.toggle("Fast demo mode for Siamese training", value=True)
@@ -1000,21 +1023,20 @@ def main():
     apply_matplotlib_theme(st.session_state.appearance)
     render_overview()
 
-    if uploaded is not None:
-        raw_bytes = uploaded.getvalue()
-        file_hash = hashlib.md5(raw_bytes).hexdigest()
+    try:
+        dataset_file_name = get_bundled_dataset_map()[dataset_label]
+        file_hash = dataset_file_name
 
         if st.session_state.file_hash != file_hash:
             reset_analysis_state(file_hash)
-            st.session_state.raw_df = pd.read_csv(StringIO(raw_bytes.decode("utf-8")))
+            st.session_state.raw_df = load_bundled_dataset(dataset_label)
             st.session_state.bundle = prepare_project_data(st.session_state.raw_df)
 
-    bundle = st.session_state.bundle
-
-    if uploaded is None:
-        st.info("Upload the project CSV from the sidebar to activate the analytical sections.")
-    else:
-        st.success("Dataset loaded successfully.")
+        bundle = st.session_state.bundle
+        st.success(f"Dataset loaded successfully: {dataset_label}.")
+    except FileNotFoundError as e:
+        bundle = None
+        st.error(str(e))
 
     if bundle is not None and run_uplift_hte:
         with st.spinner("Running uplift models and HTE analysis..."):
@@ -1063,11 +1085,11 @@ def main():
         if bundle is not None:
             render_dataset_section(bundle)
     elif page == "Uplift Modelling":
-        render_uplift_section(bundle, uplift_results) if bundle is not None else st.info("Upload the dataset first.")
+        render_uplift_section(bundle, uplift_results) if bundle is not None else st.info("Dataset file not found.")
     elif page == "HTE Analysis":
-        render_hte_section(hte_results) if bundle is not None else st.info("Upload the dataset first.")
+        render_hte_section(hte_results) if bundle is not None else st.info("Dataset file not found.")
     elif page == "Siamese Networks":
-        render_siamese_section(siamese_results) if bundle is not None else st.info("Upload the dataset first.")
+        render_siamese_section(siamese_results) if bundle is not None else st.info("Dataset file not found.")
 
 
 if __name__ == "__main__":
