@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from pathlib import Path
 from typing import Optional
 
@@ -14,7 +16,7 @@ from analysis_core import (
     run_hte_analysis,
     run_t_learner_analysis,
     run_baseline_siamese,
-    run_bag_siamese,
+    run_block_siamese,
     summarise_siamese_results,
 )
 
@@ -29,6 +31,25 @@ st.set_page_config(
 )
 
 
+SIAMESE_TITLE_MAP = {
+    "row_cnn": "Experiment 1: Row-based CNN Siamese Pair Classifier",
+    "block_cnn": "Experiment 2: Block-based CNN Siamese Pair Classifier",
+}
+
+
+def get_siamese_title(experiment_key: str) -> str:
+    return SIAMESE_TITLE_MAP.get(experiment_key, experiment_key)
+
+
+def normalise_siamese_results(siamese_results: Optional[dict]) -> Optional[dict]:
+    if not siamese_results:
+        return siamese_results
+    for key, payload in siamese_results.items():
+        if isinstance(payload, dict):
+            payload["title"] = get_siamese_title(key)
+    return siamese_results
+
+
 def build_custom_css(theme_mode: str = "Light", font_scale: float = 1.30) -> str:
     if theme_mode == "Dark":
         colors = {
@@ -37,17 +58,23 @@ def build_custom_css(theme_mode: str = "Light", font_scale: float = 1.30) -> str
             "panel": "#0f172a",
             "text": "#e5eefc",
             "muted": "#94a3b8",
-            "border": "rgba(148, 163, 184, 0.22)",
+            "border": "rgba(148, 163, 184, 0.26)",
             "accent": "#8b9cff",
             "accent_hover": "#a5b4ff",
             "accent_text": "#ffffff",
             "selected_bg": "#6d78ff",
             "selected_text": "#ffffff",
-            "selected_border": "rgba(125, 140, 255, 0.55)",
+            "selected_border": "rgba(139, 156, 255, 0.72)",
             "card_grad_1": "rgba(139, 156, 255, 0.16)",
             "card_grad_2": "rgba(34, 197, 94, 0.10)",
             "shadow": "0 14px 34px rgba(2, 6, 23, 0.34)",
             "table_header": "#172033",
+            "help_icon": "#e5eefc",
+            "help_icon_hover": "#ffffff",
+            "tooltip_bg": "#0a1020",
+            "tooltip_text": "#f8fafc",
+            "help_icon_bg": "rgba(139, 156, 255, 0.12)",
+            "tag_remove_bg": "rgba(255, 255, 255, 0.12)",
         }
     else:
         colors = {
@@ -56,17 +83,23 @@ def build_custom_css(theme_mode: str = "Light", font_scale: float = 1.30) -> str
             "panel": "#edf3fb",
             "text": "#102033",
             "muted": "#526172",
-            "border": "rgba(15, 23, 42, 0.10)",
+            "border": "rgba(15, 23, 42, 0.18)",
             "accent": "#4f46e5",
             "accent_hover": "#4338ca",
             "accent_text": "#ffffff",
-            "selected_bg": "#5b5ff5",
+            "selected_bg": "#4f46e5",
             "selected_text": "#ffffff",
-            "selected_border": "rgba(91, 95, 245, 0.32)",
+            "selected_border": "rgba(79, 70, 229, 0.58)",
             "card_grad_1": "rgba(79, 70, 229, 0.10)",
             "card_grad_2": "rgba(14, 165, 233, 0.08)",
             "shadow": "0 12px 32px rgba(15, 23, 42, 0.08)",
             "table_header": "#f2f6fc",
+            "help_icon": "#334155",
+            "help_icon_hover": "#0f172a",
+            "tooltip_bg": "#1f2937",
+            "tooltip_text": "#f8fafc",
+            "help_icon_bg": "rgba(51, 65, 85, 0.08)",
+            "tag_remove_bg": "rgba(255, 255, 255, 0.18)",
         }
 
     base_px = int(round(16 * font_scale))
@@ -95,6 +128,12 @@ def build_custom_css(theme_mode: str = "Light", font_scale: float = 1.30) -> str
     --card-grad-2: {colors["card_grad_2"]};
     --box-shadow: {colors["shadow"]};
     --table-header: {colors["table_header"]};
+    --help-icon-color: {colors["help_icon"]};
+    --help-icon-hover: {colors["help_icon_hover"]};
+    --tooltip-bg: {colors["tooltip_bg"]};
+    --tooltip-text: {colors["tooltip_text"]};
+    --help-icon-bg: {colors["help_icon_bg"]};
+    --tag-remove-bg: {colors["tag_remove_bg"]};
     --base-font-size: {base_px}px;
     --small-font-size: {small_px}px;
     --h1-font-size: {h1_px}px;
@@ -150,7 +189,7 @@ small, .small-note, .stCaption {{
 
 .hero {{
     padding: 1.45rem 1.45rem 1.05rem 1.45rem;
-    border: 1px solid var(--border-color);
+    border: 1.5px solid var(--border-color);
     border-radius: 22px;
     background: linear-gradient(135deg, var(--card-grad-1), var(--card-grad-2));
     box-shadow: var(--box-shadow);
@@ -159,15 +198,15 @@ small, .small-note, .stCaption {{
 
 .section-card {{
     padding: 1.1rem 1.1rem 0.55rem 1.1rem;
-    border: 1px solid var(--border-color);
+    border: 1.5px solid var(--border-color);
     border-radius: 18px;
     background: var(--surface-bg);
-    box-shadow: var(--box-shadow);
+    box-shadow: var(--box-shadow), inset 0 0 0 1px var(--border-color);
 }}
 
 div[data-testid="stMetric"] {{
     background: var(--surface-bg);
-    border: 1px solid var(--border-color);
+    border: 1.5px solid var(--border-color);
     padding: 0.9rem 1rem;
     border-radius: 18px;
     box-shadow: var(--box-shadow);
@@ -186,7 +225,7 @@ div[data-testid="stMetricLabel"] p,
 
 .stAlert, [data-testid="stAlert"] {{
     background: var(--surface-bg) !important;
-    border: 1px solid var(--border-color) !important;
+    border: 1.5px solid var(--border-color) !important;
     color: var(--text-color) !important;
     border-radius: 16px !important;
 }}
@@ -226,14 +265,6 @@ button[kind="secondary"]:hover {{
     border-color: transparent !important;
 }}
 
-.stButton > button:hover *,
-.stDownloadButton > button:hover *,
-button[kind="primary"]:hover *,
-button[kind="secondary"]:hover * {{
-    color: var(--accent-text) !important;
-    fill: var(--accent-text) !important;
-}}
-
 .stButton > button:focus,
 .stDownloadButton > button:focus,
 button:focus {{
@@ -249,7 +280,7 @@ button:focus {{
 .stFileUploader,
 .stNumberInput,
 .stTextInput,
-[data-baseweb="select"] > div,
+[data-baseweb="select"],
 [data-baseweb="base-input"] > div,
 [data-baseweb="input"] > div,
 [data-testid="stFileUploaderDropzone"] {{
@@ -266,8 +297,60 @@ button:focus {{
 textarea {{
     background: var(--surface-bg) !important;
     color: var(--text-color) !important;
-    border: 1px solid var(--border-color) !important;
+    border: 1.5px solid var(--border-color) !important;
     border-radius: 14px !important;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.01) !important;
+}}
+
+[data-baseweb="select"] input,
+[data-baseweb="select"] input::placeholder,
+[data-baseweb="select"] [role="combobox"],
+[data-baseweb="select"] [role="combobox"] *,
+[data-baseweb="select"] > div > div,
+[data-baseweb="select"] span {{
+    color: var(--text-color) !important;
+}}
+
+[data-baseweb="popover"],
+[data-baseweb="popover"] > div,
+[data-baseweb="popover"] ul,
+[data-baseweb="menu"],
+[data-baseweb="menu"] ul,
+[role="listbox"] {{
+    background: var(--surface-bg) !important;
+    color: var(--text-color) !important;
+    border: 1.5px solid var(--border-color) !important;
+    border-radius: 14px !important;
+    box-shadow: var(--box-shadow) !important;
+}}
+
+[role="option"],
+[data-baseweb="menu"] li,
+[data-baseweb="menu"] div[role="option"] {{
+    background: var(--surface-bg) !important;
+    color: var(--text-color) !important;
+}}
+
+[role="option"] *,
+[data-baseweb="menu"] li *,
+[data-baseweb="menu"] div[role="option"] * {{
+    color: var(--text-color) !important;
+}}
+
+[role="option"]:hover,
+[data-baseweb="menu"] li:hover {{
+    background: var(--table-header) !important;
+}}
+
+[role="option"][aria-selected="true"],
+[data-baseweb="menu"] li[aria-selected="true"] {{
+    background: var(--selected-bg) !important;
+    color: var(--selected-text) !important;
+}}
+
+[role="option"][aria-selected="true"] *,
+[data-baseweb="menu"] li[aria-selected="true"] * {{
+    color: var(--selected-text) !important;
 }}
 
 [data-baseweb="select"] svg,
@@ -279,7 +362,7 @@ textarea {{
 
 [data-baseweb="tag"] {{
     background: var(--selected-bg) !important;
-    border: 1px solid var(--selected-border) !important;
+    border: 1.25px solid var(--selected-border) !important;
     border-radius: 10px !important;
     box-shadow: none !important;
 }}
@@ -289,7 +372,14 @@ textarea {{
 [data-baseweb="tag"] div,
 [data-baseweb="tag"] p {{
     color: var(--selected-text) !important;
+    background: transparent !important;
     fill: var(--selected-text) !important;
+}}
+
+[data-baseweb="tag"] button,
+[data-baseweb="tag"] [role="button"] {{
+    background: var(--tag-remove-bg) !important;
+    border-radius: 999px !important;
 }}
 
 [data-baseweb="tag"] svg,
@@ -308,7 +398,7 @@ textarea {{
 
 [data-baseweb="tab-list"] button {{
     background: rgba(255,255,255,0.02) !important;
-    border: 1px solid var(--border-color) !important;
+    border: 1.5px solid var(--border-color) !important;
     border-radius: 12px !important;
     color: var(--muted-color) !important;
     font-size: var(--base-font-size) !important;
@@ -344,7 +434,7 @@ textarea {{
 div[data-testid="stDataFrame"],
 div[data-testid="stTable"] {{
     background: var(--surface-bg) !important;
-    border: 1px solid var(--border-color) !important;
+    border: 1.5px solid var(--border-color) !important;
     border-radius: 18px !important;
     overflow: hidden;
 }}
@@ -363,11 +453,115 @@ tbody tr td {{
     color: var(--text-color) !important;
 }}
 
-code, pre {{
-    background: rgba(255,255,255,0.03) !important;
+div[data-testid="stJson"],
+div[data-testid="stJson"] > div,
+div[data-testid="stJson"] * {{
+    background: var(--panel-bg) !important;
     color: var(--text-color) !important;
+}}
+
+[data-testid="stCode"],
+[data-testid="stCode"] pre,
+[data-testid="stCodeBlock"],
+[data-testid="stCodeBlock"] pre,
+code, pre {{
+    background: var(--panel-bg) !important;
+    color: var(--text-color) !important;
+    border: 1.5px solid var(--border-color) !important;
+    border-radius: 12px !important;
+}}
+
+[data-testid="stTooltipIcon"],
+button[aria-label*="help"],
+button[aria-label*="Help"],
+button[aria-label*="information"],
+button[aria-label*="Information"] {{
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 1.15rem !important;
+    height: 1.15rem !important;
+    min-width: 1.15rem !important;
+    flex: 0 0 1.15rem !important;
+    position: relative !important;
+    border: 1.25px solid var(--help-icon-color) !important;
+    border-radius: 999px !important;
+    background: var(--help-icon-bg) !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    color: transparent !important;
+}}
+
+[data-testid="stTooltipIcon"] svg,
+[data-testid="stTooltipIcon"] path,
+button[aria-label*="help"] svg,
+button[aria-label*="help"] path,
+button[aria-label*="Help"] svg,
+button[aria-label*="Help"] path,
+button[aria-label*="information"] svg,
+button[aria-label*="information"] path,
+button[aria-label*="Information"] svg,
+button[aria-label*="Information"] path {{
+    opacity: 0 !important;
+    fill: transparent !important;
+    stroke: transparent !important;
+}}
+
+[data-testid="stTooltipIcon"]::after,
+button[aria-label*="help"]::after,
+button[aria-label*="Help"]::after,
+button[aria-label*="information"]::after,
+button[aria-label*="Information"]::after {{
+    content: "?";
+    color: var(--help-icon-color) !important;
+    font-size: calc(var(--base-font-size) * 0.62) !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    position: absolute !important;
+    inset: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    opacity: 1 !important;
+    z-index: 2 !important;
+    pointer-events: none !important;
+}}
+
+[data-testid="stTooltipIcon"]:hover,
+button[aria-label*="help"]:hover,
+button[aria-label*="Help"]:hover,
+button[aria-label*="information"]:hover,
+button[aria-label*="Information"]:hover {{
+    border-color: var(--help-icon-hover) !important;
+    background: var(--help-icon-bg) !important;
+}}
+
+[data-testid="stTooltipIcon"]:hover::after,
+button[aria-label*="help"]:hover::after,
+button[aria-label*="Help"]:hover::after,
+button[aria-label*="information"]:hover::after,
+button[aria-label*="Information"]:hover::after {{
+    color: var(--help-icon-hover) !important;
+}}
+
+[role="tooltip"],
+[data-baseweb="tooltip"],
+[data-baseweb="tooltip"] > div,
+[data-baseweb="popover"][role="tooltip"],
+[data-baseweb="popover"][role="tooltip"] > div {{
+    background: var(--tooltip-bg) !important;
+    color: var(--tooltip-text) !important;
     border: 1px solid var(--border-color) !important;
     border-radius: 12px !important;
+    box-shadow: var(--box-shadow) !important;
+}}
+
+[role="tooltip"] *,
+[data-baseweb="tooltip"] *,
+[data-baseweb="popover"][role="tooltip"] * {{
+    background: transparent !important;
+    color: var(--tooltip-text) !important;
 }}
 
 hr {{
@@ -375,7 +569,6 @@ hr {{
 }}
 </style>
 """
-
 
 def apply_theme_css(theme_mode: str, font_scale: float):
     st.markdown(build_custom_css(theme_mode=theme_mode, font_scale=font_scale), unsafe_allow_html=True)
@@ -670,7 +863,7 @@ def render_overview():
             """
             <div class="section-card">
             <h4>3. Siamese Experiments</h4>
-            <p>Present the baseline pair-based CNN and the bag-based CNN using the supplied project modules and configurations.</p>
+            <p>Present the row-based CNN and the block-based CNN using the supplied project modules and configurations.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -953,10 +1146,10 @@ def render_siamese_section(siamese_results: Optional[dict]):
             plot_roc(res["test"]["fpr"], res["test"]["tpr"], res["test"]["auc"], f"Test ROC — {res['title']}"),
             use_container_width=True,
         )
-        st.json(res["test"]["score_summary"])
+        st.code(json.dumps(res["test"]["score_summary"], indent=2), language="json")
 
     with tab3:
-        st.json(res["config"])
+        st.code(json.dumps(res["config"], indent=2), language="json")
 
 
 
@@ -986,7 +1179,7 @@ def render_final_highlights(bundle: Optional[dict], uplift_results: Optional[dic
         )
 
     if not points:
-        st.info("Upload the dataset and run at least one analysis block to generate presentation highlights.")
+        st.info("Select a dataset and run at least one analysis block to generate presentation highlights.")
         return
 
     for i, point in enumerate(points, start=1):
@@ -1007,11 +1200,10 @@ def main():
             ["Light", "Dark"],
             horizontal=True,
             key="appearance",
-            help="Switch the dashboard palette between light and dark presentation modes.",
         )
         if "font_scale" not in st.session_state:
             st.session_state.font_scale = 1.20
-            
+
         st.slider(
             "Font size scale",
             min_value=1.00,
@@ -1024,15 +1216,16 @@ def main():
         dataset_label = st.selectbox(
             "Dataset",
             options=list(get_bundled_dataset_map().keys()),
-            help="Choose which bundled dataset to use throughout the dashboard.",
+            help="Choose which bundled dataset to use throughout the dashboard.\n\nModified dataset: a diagnostic version of the original data in which the treatment groups were made more distinct so the models can be checked under clearer signal.",
         )
         topk = st.slider("Manual top-k policy", 0.05, 1.00, 0.80, 0.05)
         boot_n = st.select_slider("Bootstrap samples", options=[200, 400, 800, 1000, 2000], value=2000)
-        siamese_fast_mode = st.toggle("Fast demo mode for Siamese training", value=True)
+        siamese_fast_mode = st.toggle("Fast demo mode for Siamese training", value=False)
         siamese_choices = st.multiselect(
             "Siamese experiments to run",
-            options=["baseline_cnn_pair", "bag_cnn"],
-            default=["baseline_cnn_pair", "bag_cnn"],
+            options=["row_cnn", "block_cnn"],
+            default=["row_cnn", "block_cnn"],
+            format_func=get_siamese_title,
         )
         page = st.radio(
             "Go to section",
@@ -1085,15 +1278,17 @@ def main():
         with st.spinner("Running Siamese experiments..."):
             siamese_results = st.session_state.siamese_results or {}
             for exp in siamese_choices:
-                if exp == "baseline_cnn_pair":
+                if exp == "row_cnn":
                     siamese_results[exp] = run_baseline_siamese(bundle, fast_mode=siamese_fast_mode)
-                elif exp == "bag_cnn":
-                    siamese_results[exp] = run_bag_siamese(bundle, fast_mode=siamese_fast_mode)
-            st.session_state.siamese_results = siamese_results
+                elif exp == "block_cnn":
+                    siamese_results[exp] = run_block_siamese(bundle, fast_mode=siamese_fast_mode)
+                if exp in siamese_results:
+                    siamese_results[exp]["title"] = get_siamese_title(exp)
+            st.session_state.siamese_results = normalise_siamese_results(siamese_results)
 
     uplift_results = st.session_state.uplift_results
     hte_results = st.session_state.hte_results
-    siamese_results = st.session_state.siamese_results
+    siamese_results = normalise_siamese_results(st.session_state.siamese_results)
 
     if page == "Overview":
         if bundle is not None:
