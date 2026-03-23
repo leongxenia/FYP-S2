@@ -635,10 +635,10 @@ def _ensure_siamese_imports():
         dst2.write_text(src2.read_text())
 
     from run_siamese_experiment import run_experiment_by_name
-    from siamese_config import BASE_PAIR_CONFIG, BAG_CONFIG
-    from siamese_data import prepare_encoded_data, PairDataset, BagPairDataset
+    from siamese_config import BASE_PAIR_CONFIG, BLOCK_CONFIG
+    from siamese_data import prepare_encoded_data, PairDataset, BlockPairDataset
     from siamese_eval import predict_pair_scores, evaluate_pairs, predict_scores_and_loss, compute_metrics
-    from siamese_models import SiameseCNNPairClassifier, SiameseBagPairClassifier
+    from siamese_models import SiameseCNNPairClassifier, SiameseBlockPairClassifier
     from siamese_utils import set_seed, get_device
     import torch
     from torch.utils.data import DataLoader
@@ -646,16 +646,16 @@ def _ensure_siamese_imports():
     return {
         "run_experiment_by_name": run_experiment_by_name,
         "BASE_PAIR_CONFIG": BASE_PAIR_CONFIG,
-        "BAG_CONFIG": BAG_CONFIG,
+        "BLOCK_CONFIG": BLOCK_CONFIG,
         "prepare_encoded_data": prepare_encoded_data,
         "PairDataset": PairDataset,
-        "BagPairDataset": BagPairDataset,
+        "BlockPairDataset": BlockPairDataset,
         "predict_pair_scores": predict_pair_scores,
         "evaluate_pairs": evaluate_pairs,
         "predict_scores_and_loss": predict_scores_and_loss,
         "compute_metrics": compute_metrics,
         "SiameseCNNPairClassifier": SiameseCNNPairClassifier,
-        "SiameseBagPairClassifier": SiameseBagPairClassifier,
+        "SiameseBlockPairClassifier": SiameseBlockPairClassifier,
         "set_seed": set_seed,
         "get_device": get_device,
         "torch": torch,
@@ -706,9 +706,27 @@ def _run_baseline_siamese_impl(bundle: dict, fast_mode: bool):
         bundle['T_train'], bundle['T_val'], bundle['T_test'],
     )
 
-    train_ds = m['PairDataset'](Xtr, Ttr, n_pairs=cfg['train_pairs'], pos_fraction=cfg['pos_fraction'], seed=cfg['seed'], include_ba=cfg['include_ba'])
-    val_ds = m['PairDataset'](Xva, Tva, n_pairs=cfg['val_pairs'], pos_fraction=cfg['pos_fraction'], seed=cfg['seed'] + 1, include_ba=cfg['include_ba'])
-    test_ds = m['PairDataset'](Xte, Tte, n_pairs=cfg['test_pairs'], pos_fraction=cfg['pos_fraction'], seed=cfg['seed'] + 2, include_ba=cfg['include_ba'])
+    train_ds = m['PairDataset'](
+        Xtr, Ttr,
+        n_pairs=cfg['train_pairs'],
+        pos_fraction=cfg['pos_fraction'],
+        seed=cfg['seed'],
+        include_ba=cfg['include_ba'],
+    )
+    val_ds = m['PairDataset'](
+        Xva, Tva,
+        n_pairs=cfg['val_pairs'],
+        pos_fraction=cfg['pos_fraction'],
+        seed=cfg['seed'] + 1,
+        include_ba=cfg['include_ba'],
+    )
+    test_ds = m['PairDataset'](
+        Xte, Tte,
+        n_pairs=cfg['test_pairs'],
+        pos_fraction=cfg['pos_fraction'],
+        seed=cfg['seed'] + 2,
+        include_ba=cfg['include_ba'],
+    )
 
     train_loader = m['DataLoader'](train_ds, batch_size=cfg['batch_size'], shuffle=True, drop_last=True)
     val_loader = m['DataLoader'](val_ds, batch_size=cfg['batch_size'], shuffle=False)
@@ -765,11 +783,11 @@ def _run_baseline_siamese_impl(bundle: dict, fast_mode: bool):
     }
 
 
-def _run_bag_siamese_impl(bundle: dict, fast_mode: bool):
+def _run_block_siamese_impl(bundle: dict, fast_mode: bool):
     m = _ensure_siamese_imports()
-    cfg = copy.deepcopy(m['BAG_CONFIG'])
+    cfg = copy.deepcopy(m['BLOCK_CONFIG'])
     if fast_mode:
-        cfg = _downscale_cfg(cfg, 'bag')
+        cfg = _downscale_cfg(cfg, 'block')
 
     m['set_seed'](cfg['seed'])
     device = m['get_device']()
@@ -781,27 +799,42 @@ def _run_bag_siamese_impl(bundle: dict, fast_mode: bool):
         bundle['T_train'], bundle['T_val'], bundle['T_test'],
     )
 
-    train_ds = m['BagPairDataset'](
+    train_ds = m['BlockPairDataset'](
         Xtr, Ttr,
-        bag_size=cfg['bag_size'], n_pairs=cfg['train_pairs'], pos_fraction=cfg['pos_fraction'],
-        include_ba=cfg['include_ba'], seed=cfg['seed'], within_bag_replace=cfg['within_bag_replace'], max_row_reuse=cfg['max_row_reuse'],
+        block_size=cfg['block_size'],
+        n_pairs=cfg['train_pairs'],
+        pos_fraction=cfg['pos_fraction'],
+        include_ba=cfg['include_ba'],
+        seed=cfg['seed'],
+        within_block_replace=cfg['within_block_replace'],
+        max_row_reuse=cfg['max_row_reuse'],
     )
-    val_ds = m['BagPairDataset'](
+    val_ds = m['BlockPairDataset'](
         Xva, Tva,
-        bag_size=cfg['bag_size'], n_pairs=cfg['val_pairs'], pos_fraction=cfg['pos_fraction'],
-        include_ba=cfg['include_ba'], seed=cfg['seed'] + 1, within_bag_replace=cfg['within_bag_replace'], max_row_reuse=None,
+        block_size=cfg['block_size'],
+        n_pairs=cfg['val_pairs'],
+        pos_fraction=cfg['pos_fraction'],
+        include_ba=cfg['include_ba'],
+        seed=cfg['seed'] + 1,
+        within_block_replace=cfg['within_block_replace'],
+        max_row_reuse=None,
     )
-    test_ds = m['BagPairDataset'](
+    test_ds = m['BlockPairDataset'](
         Xte, Tte,
-        bag_size=cfg['bag_size'], n_pairs=cfg['test_pairs'], pos_fraction=cfg['pos_fraction'],
-        include_ba=cfg['include_ba'], seed=cfg['seed'] + 2, within_bag_replace=cfg['within_bag_replace'], max_row_reuse=None,
+        block_size=cfg['block_size'],
+        n_pairs=cfg['test_pairs'],
+        pos_fraction=cfg['pos_fraction'],
+        include_ba=cfg['include_ba'],
+        seed=cfg['seed'] + 2,
+        within_block_replace=cfg['within_block_replace'],
+        max_row_reuse=None,
     )
 
     train_loader = m['DataLoader'](train_ds, batch_size=cfg['batch_size'], shuffle=True, drop_last=True)
     val_loader = m['DataLoader'](val_ds, batch_size=cfg['batch_size'], shuffle=False)
     test_loader = m['DataLoader'](test_ds, batch_size=cfg['batch_size'], shuffle=False)
 
-    model = m['SiameseBagPairClassifier'](
+    model = m['SiameseBlockPairClassifier'](
         input_dim=Xtr.shape[1],
         emb_dim=cfg.get('emb_dim', 16),
         c1=cfg.get('c1', 16),
@@ -812,8 +845,8 @@ def _run_bag_siamese_impl(bundle: dict, fast_mode: bool):
         head_hidden=cfg.get('head_hidden', 32),
         head_dropout=cfg.get('head_dropout', 0.5),
     )
-    from siamese_trainers import train_bag_classifier
-    model, history = train_bag_classifier(
+    from siamese_trainers import train_block_classifier
+    model, history = train_block_classifier(
         model=model,
         train_loader=train_loader,
         val_loader=val_loader,
@@ -827,12 +860,11 @@ def _run_bag_siamese_impl(bundle: dict, fast_mode: bool):
     test_scores, test_labels, test_loss = m['predict_scores_and_loss'](model, test_loader, device)
     test_auc, test_acc, test_fpr, test_tpr = m['compute_metrics'](test_scores, test_labels)
 
-    # Validation metrics for app plotting convenience.
     val_scores, val_labels, val_loss = m['predict_scores_and_loss'](model, val_loader, device)
     val_auc, val_acc, val_fpr, val_tpr = m['compute_metrics'](val_scores, val_labels)
 
     return {
-        'title': 'Experiment 2: Bag-Based CNN Siamese Model',
+        'title': 'Experiment 2: Block-Based CNN Siamese Model',
         'history': history,
         'device': str(device),
         'encoded_shapes': {'train': list(Xtr.shape), 'val': list(Xva.shape), 'test': list(Xte.shape)},
@@ -868,8 +900,8 @@ def run_baseline_siamese(bundle: dict, fast_mode: bool = True) -> dict:
     return _run_baseline_siamese_impl(bundle, fast_mode=fast_mode)
 
 
-def run_bag_siamese(bundle: dict, fast_mode: bool = True) -> dict:
-    return _run_bag_siamese_impl(bundle, fast_mode=fast_mode)
+def run_block_siamese(bundle: dict, fast_mode: bool = True) -> dict:
+    return _run_block_siamese_impl(bundle, fast_mode=fast_mode)
 
 
 def summarise_siamese_results(siamese_results: dict) -> pd.DataFrame:

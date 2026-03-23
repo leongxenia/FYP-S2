@@ -2,28 +2,28 @@
 Master runner for the retained Siamese experiments.
 
 Available experiment names:
-    - "baseline_cnn_pair"
-    - "bag_cnn"
+    - "row_cnn"
+    - "block_cnn"
 """
 
-from exp_01_baseline_cnn_pair import run_experiment as run_baseline_cnn_pair
-from exp_02_bag_cnn import run_experiment as run_bag_cnn
+from exp_01_row_cnn import run_experiment as run_row_cnn
+from exp_02_block_cnn import run_experiment as run_block_cnn
 
 
 EXPERIMENT_REGISTRY = {
-    "baseline_cnn_pair": {
-        "runner": run_baseline_cnn_pair,
-        "title": "Experiment 1: Baseline CNN Siamese Pair Classifier",
+    "row_cnn": {
+        "runner": run_row_cnn,
+        "title": "Experiment 1: Row CNN Siamese Pair Classifier",
         "description": (
             "Row-level Siamese pair classifier using a shared 1D CNN encoder "
             "and same/different pair labels."
         ),
     },
-    "bag_cnn": {
-        "runner": run_bag_cnn,
-        "title": "Experiment 2: Bag-Based CNN Siamese Model",
+    "block_cnn": {
+        "runner": run_block_cnn,
+        "title": "Experiment 2: Block-Based CNN Siamese Model",
         "description": (
-            "Bag-level Siamese classifier using grouped rows to reduce row-level "
+            "Block-level Siamese classifier using grouped rows to reduce row-level "
             "instability while keeping the pair-classification framework."
         ),
     },
@@ -38,7 +38,6 @@ def print_available_experiments():
         print(f"  {meta['description']}\n")
 
 
-
 def get_experiment_runner(experiment_name: str):
     if experiment_name not in EXPERIMENT_REGISTRY:
         valid = ", ".join(EXPERIMENT_REGISTRY.keys())
@@ -47,7 +46,6 @@ def get_experiment_runner(experiment_name: str):
             f"Valid options are: {valid}"
         )
     return EXPERIMENT_REGISTRY[experiment_name]["runner"]
-
 
 
 def run_experiment_by_name(
@@ -84,7 +82,6 @@ def run_experiment_by_name(
         T_test=T_test,
     )
     return model, history
-
 
 
 def run_all_experiments(

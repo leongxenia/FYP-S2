@@ -121,7 +121,7 @@ def train_pair_classifier(
     return model, history
 
 
-def train_bag_classifier(
+def train_block_classifier(
     model,
     train_loader,
     val_loader,
@@ -154,13 +154,13 @@ def train_bag_classifier(
         running_loss = 0.0
         n_batches = 0
 
-        for bag1, bag2, y in train_loader:
-            bag1 = bag1.to(device)
-            bag2 = bag2.to(device)
+        for block1, block2, y in train_loader:
+            block1 = block1.to(device)
+            block2 = block2.to(device)
             y = y.to(device)
 
             opt.zero_grad()
-            logits = model(bag1, bag2)
+            logits = model(block1, block2)
             loss = crit(logits, y)
             loss.backward()
 

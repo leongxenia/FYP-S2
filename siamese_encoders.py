@@ -37,7 +37,8 @@ class CNN1DEncoder(nn.Module):
         z = self.fc(h)
         return z
 
-class CNNBagEncoder(nn.Module):
+
+class CNNBlockEncoder(nn.Module):
     def __init__(
         self,
         input_dim,
@@ -66,12 +67,12 @@ class CNNBagEncoder(nn.Module):
         self.pooling = pooling
         self.l2_normalize = l2_normalize
 
-    def forward(self, bag_x):
-        B, K, D = bag_x.shape
+    def forward(self, block_x):
+        B, K, D = block_x.shape
 
-        x_flat = bag_x.view(B * K, D)          # (B*K, D)
-        row_emb = self.row_encoder(x_flat)     # (B*K, emb_dim)
-        row_emb = row_emb.view(B, K, -1)       # (B, K, emb_dim)
+        x_flat = block_x.view(B * K, D)         # (B*K, D)
+        row_emb = self.row_encoder(x_flat)      # (B*K, emb_dim)
+        row_emb = row_emb.view(B, K, -1)        # (B, K, emb_dim)
 
         if self.pooling == "mean":
             z = row_emb.mean(dim=1)
@@ -82,8 +83,9 @@ class CNNBagEncoder(nn.Module):
             z = F.normalize(z, p=2, dim=1)
 
         return z
-        
-class BagEncoder(nn.Module):
+
+
+class BlockEncoder(nn.Module):
     def __init__(self, input_dim, row_hidden=(32, 32), emb_dim=16, dropout=0.35):
         super().__init__()
         layers = []
@@ -94,9 +96,9 @@ class BagEncoder(nn.Module):
         self.row_net = nn.Sequential(*layers)
         self.to_emb = nn.Linear(prev, emb_dim)
 
-    def forward(self, bag_x):
-        B, K, D = bag_x.shape
-        x_flat = bag_x.view(B * K, D)
+    def forward(self, block_x):
+        B, K, D = block_x.shape
+        x_flat = block_x.view(B * K, D)
         h = self.row_net(x_flat)
         h = h.view(B, K, -1)
         pooled = h.mean(dim=1)

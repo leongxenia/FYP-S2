@@ -42,12 +42,12 @@ def predict_scores_and_loss(model, loader, device):
     loss_sum = 0.0
     n_batches = 0
 
-    for bag1, bag2, y in loader:
-        bag1 = bag1.to(device)
-        bag2 = bag2.to(device)
+    for block1, block2, y in loader:
+        block1 = block1.to(device)
+        block2 = block2.to(device)
         y = y.to(device)
 
-        logits = model(bag1, bag2)
+        logits = model(block1, block2)
         loss = crit(logits, y)
 
         loss_sum += loss.item()

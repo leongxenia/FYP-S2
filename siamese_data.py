@@ -95,9 +95,9 @@ class PairDataset(Dataset):
         return x1, x2, y
 
 
-class BagPairDataset(Dataset):
+class BlockPairDataset(Dataset):
     """
-    Bag pair labels:
+    Block pair labels:
       same = 0 : (A,A) or (B,B)
       diff = 1 : (A,B) or (B,A)
     """
@@ -106,19 +106,19 @@ class BagPairDataset(Dataset):
         self,
         X,
         T,
-        bag_size=10,
+        block_size=10,
         n_pairs=50000,
         pos_fraction=0.5,
         include_ba=True,
         seed=42,
-        within_bag_replace=False,
+        within_block_replace=False,
         max_row_reuse=None,
     ):
         rng = np.random.default_rng(seed)
 
         self.X = X
         self.T = T
-        self.bag_size = int(bag_size)
+        self.block_size = int(block_size)
 
         idx_A = np.where(T == 0)[0]
         idx_B = np.where(T == 1)[0]
@@ -131,10 +131,10 @@ class BagPairDataset(Dataset):
 
         reuse = np.zeros(len(T), dtype=np.int32) if max_row_reuse is not None else None
 
-        def sample_bag(idx_pool):
-            k = self.bag_size
+        def sample_block(idx_pool):
+            k = self.block_size
 
-            if (not within_bag_replace) and (len(idx_pool) >= k):
+            if (not within_block_replace) and (len(idx_pool) >= k):
                 replace_within = False
             else:
                 replace_within = True
@@ -146,10 +146,10 @@ class BagPairDataset(Dataset):
             if len(candidates) < k:
                 candidates = idx_pool
 
-            bag = rng.choice(candidates, size=k, replace=replace_within)
-            for j in bag:
+            block = rng.choice(candidates, size=k, replace=replace_within)
+            for j in block:
                 reuse[j] += 1
-            return bag
+            return block
 
         pairs = []
         labels = []
@@ -159,26 +159,26 @@ class BagPairDataset(Dataset):
             n_ba = n_diff - n_ab
 
             for _ in range(n_ab):
-                pairs.append((sample_bag(idx_A), sample_bag(idx_B)))
+                pairs.append((sample_block(idx_A), sample_block(idx_B)))
                 labels.append(1)
 
             for _ in range(n_ba):
-                pairs.append((sample_bag(idx_B), sample_bag(idx_A)))
+                pairs.append((sample_block(idx_B), sample_block(idx_A)))
                 labels.append(1)
         else:
             for _ in range(n_diff):
-                pairs.append((sample_bag(idx_A), sample_bag(idx_B)))
+                pairs.append((sample_block(idx_A), sample_block(idx_B)))
                 labels.append(1)
 
         n_same_A = n_same // 2
         n_same_B = n_same - n_same_A
 
         for _ in range(n_same_A):
-            pairs.append((sample_bag(idx_A), sample_bag(idx_A)))
+            pairs.append((sample_block(idx_A), sample_block(idx_A)))
             labels.append(0)
 
         for _ in range(n_same_B):
-            pairs.append((sample_bag(idx_B), sample_bag(idx_B)))
+            pairs.append((sample_block(idx_B), sample_block(idx_B)))
             labels.append(0)
 
         perm = rng.permutation(len(labels))
@@ -189,8 +189,8 @@ class BagPairDataset(Dataset):
         return len(self.labels)
 
     def __getitem__(self, i):
-        bag1_idx, bag2_idx = self.pairs[i]
-        bag1 = torch.from_numpy(self.X[bag1_idx])
-        bag2 = torch.from_numpy(self.X[bag2_idx])
+        block1_idx, block2_idx = self.pairs[i]
+        block1 = torch.from_numpy(self.X[block1_idx])
+        block2 = torch.from_numpy(self.X[block2_idx])
         y = torch.tensor(self.labels[i], dtype=torch.long)
-        return bag1, bag2, y
+        return block1, block2, y

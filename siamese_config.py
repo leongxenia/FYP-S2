@@ -16,27 +16,23 @@ BASE_PAIR_CONFIG = {
     "include_ba": True,
 }
 
-BAG_CONFIG = {
+BLOCK_CONFIG = {
     "seed": SEED,
-
-    # bag construction
-    "bag_size": 5,
+    "block_size": 5,
     "train_pairs": 30000,
     "val_pairs": 20000,
     "test_pairs": 30000,
     "pos_fraction": 0.5,
     "include_ba": True,
-    "within_bag_replace": False,
+    "within_block_replace": False,
     "max_row_reuse": 20,
 
-    # training
     "batch_size": 256,
     "lr": 5e-4,
     "weight_decay": 1e-2,
     "max_epochs": 30,
     "patience": 6,
 
-    # CNN bag encoder
     "emb_dim": 8,
     "c1": 8,
     "c2": 16,
@@ -44,7 +40,6 @@ BAG_CONFIG = {
     "encoder_dropout": 0.20,
     "pooling": "mean",
 
-    # Classifier head
     "head_hidden": 12,
     "head_dropout": 0.35,
 }

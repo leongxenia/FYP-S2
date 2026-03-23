@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from siamese_encoders import CNN1DEncoder, CNNBagEncoder
+from siamese_encoders import CNN1DEncoder, CNNBlockEncoder
 
 
 class SiameseCNNPairClassifier(nn.Module):
@@ -34,7 +34,7 @@ class SiameseCNNPairClassifier(nn.Module):
         return logits
 
 
-class SiameseBagPairClassifier(nn.Module):
+class SiameseBlockPairClassifier(nn.Module):
     def __init__(
         self,
         input_dim,
@@ -49,7 +49,7 @@ class SiameseBagPairClassifier(nn.Module):
     ):
         super().__init__()
 
-        self.encoder = CNNBagEncoder(
+        self.encoder = CNNBlockEncoder(
             input_dim=input_dim,
             emb_dim=emb_dim,
             c1=c1,
@@ -66,9 +66,9 @@ class SiameseBagPairClassifier(nn.Module):
             nn.Linear(head_hidden, 2),
         )
 
-    def forward(self, bag1, bag2):
-        z1 = self.encoder(bag1)
-        z2 = self.encoder(bag2)
+    def forward(self, block1, block2):
+        z1 = self.encoder(block1)
+        z2 = self.encoder(block2)
         diff = torch.abs(z1 - z2)
         logits = self.head(diff)
         return logits
